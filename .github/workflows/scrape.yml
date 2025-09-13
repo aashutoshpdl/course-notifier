@@ -1,0 +1,15 @@
+name: Scrape
+
+on:
+  schedule:
+    - cron: "*/3 * * * *"   # every 3 minutes
+  workflow_dispatch:        # allow manual run too
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run placeholder script
+        run: node scraper.js
+
