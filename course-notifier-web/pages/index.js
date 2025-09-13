@@ -5,29 +5,48 @@ export default function Home() {
   const [courses, setCourses] = useState([]);
 
   useEffect(() => {
-    // Fetch initial courses
-    supabase
-      .from("courses")
-      .select("*")
-      .order("first_seen", { ascending: false })
-      .then(({ data }) => setCourses(data || []));
+  // Request notification permission on page load
+  if ("Notification" in window) {
+    Notification.requestPermission();
+  }
 
-    // Realtime subscription using v2 syntax
-    const coursesChannel = supabase
-      .channel("courses-channel")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "courses" },
-        (payload) => {
-          setCourses((prev) => [payload.new, ...prev]);
+  // Fetch initial courses
+  supabase
+    .from("courses")
+    .select("*")
+    .order("first_seen", { ascending: false })
+    .then(({ data }) => setCourses(data || []));
+
+  // Prepare audio
+  const audio = new Audio("/ding.mp3");
+
+  //  Realtime subscription
+  const coursesChannel = supabase
+    .channel("courses-channel")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "courses" },
+      (payload) => {
+        setCourses((prev) => [payload.new, ...prev]);
+
+        // Browser notification
+        if (Notification.permission === "granted") {
+          new Notification("New Course Added!", {
+            body: payload.new.title,
+          });
         }
-      )
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(coursesChannel);
-    };
-  }, []);
+        // Play sound
+        audio.play();
+      }
+    )
+    .subscribe();
+
+  // Cleanup subscription on unmount
+  return () => {
+    supabase.removeChannel(coursesChannel);
+  };
+}, []);
 
   const containerStyle = {
     maxWidth: "800px",
