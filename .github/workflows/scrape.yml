@@ -2,27 +2,42 @@ name: Scrape
 
 on:
   schedule:
-    - cron: "*/3 * * * *"   # every 3 minutes
+    - cron: "*/4 * * * *"   # every 4 minutes
   workflow_dispatch:        # allow manual run too
 
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
-          
+
+      - name: Install system dependencies for Puppeteer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2
+
       - name: Install dependencies
         run: npm install
-        
+
       - name: Run scraper
         run: node scraper.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-
-
-

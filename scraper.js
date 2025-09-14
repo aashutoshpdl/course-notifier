@@ -1,5 +1,5 @@
-const fetch = require("node-fetch");
-const cheerio = require("cheerio");
+require("dotenv").config();
+const puppeteer = require("puppeteer");
 const { createClient } = require("@supabase/supabase-js");
 
 // Supabase client
@@ -8,20 +8,24 @@ const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function scrapeCourses() {
-  const res = await fetch("https://www.courspora.my.id/course");
-  const html = await res.text();
-  const $ = cheerio.load(html);
+  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+  const page = await browser.newPage();
 
-  const courses = [];
-  $("a.font-bold.line-clamp-2").each((_, el) => {
-    const title = $(el).text().trim();
-    if (title) courses.push(title);
+  await page.goto("https://www.courspora.my.id/course", {
+    waitUntil: "networkidle2",
+    timeout: 60000,
   });
 
-  console.log("Found courses:", courses);
+  // Extract top 5 course titles
+  const courses = await page.$$eval(
+    "a.font-bold.line-clamp-2",
+    (els) => els.map((el) => el.textContent.trim()).filter(Boolean)
+  );
 
-  for (const title of courses) {
-    // Check if exists
+  const topCourses = courses.slice(0, 5);
+
+  for (const title of topCourses) {
+    // Check if course already exists in DB
     const { data, error } = await supabase
       .from("courses")
       .select("id")
@@ -33,19 +37,24 @@ async function scrapeCourses() {
       continue;
     }
 
+    // Insert only if new
     if (!data) {
       const { error: insertError } = await supabase
         .from("courses")
         .insert([{ title, first_seen: new Date().toISOString() }]);
 
-      if (insertError) console.error("Insert failed:", insertError);
-      else console.log("Inserted new course:", title);
-    } else {
-      console.log("Already in DB:", title);
+      if (insertError) {
+        console.error("Insert failed:", insertError);
+      } else {
+        console.log("New course saved:", title);
+
+        // 👉 Place to trigger notification (Supabase function or webhook)
+        // e.g. call your /notify endpoint here
+      }
     }
   }
+
+  await browser.close();
 }
 
 scrapeCourses().catch(console.error);
-
-
